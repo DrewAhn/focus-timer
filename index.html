@@ -726,7 +726,7 @@
         }
 
         // 타이머 시작
-        function startTimer() {
+        function startTimer(autoStart = false) {
             if (isRunning) return;
             
             isRunning = true;
@@ -735,10 +735,15 @@
             
             timerDisplay.classList.add('running');
             
-            if (currentMode === 'focus') {
-                statusMessage.textContent = 'Stay focused! 🎯';
-            } else {
-                statusMessage.textContent = 'Enjoy your break! 🌈';
+            // 수동 시작 시에만 소리 재생 (자동 전환 시에는 이미 재생됨)
+            if (!autoStart) {
+                if (currentMode === 'focus') {
+                    playFocusStartSound(); // 높고 경쾌하게 3번
+                    statusMessage.textContent = 'Stay focused! 🎯';
+                } else {
+                    playBreakStartSound(); // 차분하게 낮은 소리
+                    statusMessage.textContent = 'Enjoy your break! 🌈';
+                }
             }
             
             timerInterval = setInterval(() => {
@@ -796,18 +801,38 @@
             if (currentMode === 'focus') {
                 statusMessage.textContent = '🎉 Focus session complete! Switching to break...';
                 
-                // 2초 후 Break 모드로 자동 전환
+                // 2초 후 Break 모드로 자동 전환 + 자동 시작
                 setTimeout(() => {
                     switchMode('break');
                     statusMessage.textContent = 'Break time! Take a rest ☕';
+                    
+                    // Break 시작 소리 재생 후 타이머 자동 시작
+                    if (soundEnabled) {
+                        playBreakStartSound();
+                    }
+                    
+                    // 0.5초 후 타이머 자동 시작 (소리가 난 후)
+                    setTimeout(() => {
+                        startTimer(true); // autoStart = true
+                    }, 500);
                 }, 2000);
             } else {
                 statusMessage.textContent = '⏰ Break time is over! Switching to focus...';
                 
-                // 2초 후 Focus 모드로 자동 전환
+                // 2초 후 Focus 모드로 자동 전환 + 자동 시작
                 setTimeout(() => {
                     switchMode('focus');
                     statusMessage.textContent = 'Ready to focus again! 💪';
+                    
+                    // Focus 시작 소리 재생 후 타이머 자동 시작
+                    if (soundEnabled) {
+                        playFocusStartSound();
+                    }
+                    
+                    // 0.5초 후 타이머 자동 시작 (소리가 난 후)
+                    setTimeout(() => {
+                        startTimer(true); // autoStart = true
+                    }, 500);
                 }, 2000);
             }
         }
@@ -848,7 +873,88 @@
             }
         }
         
-        // 종소리 재생 함수 (Web Audio API)
+        // Focus 시작 소리 - 높고 경쾌하게 3번 "띵-띵-띵"
+        function playFocusStartSound() {
+            if (!soundEnabled) return;
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioContext.currentTime;
+                
+                // 3번 반복되는 높은 음
+                for (let i = 0; i < 3; i++) {
+                    const startTime = now + (i * 0.3);
+                    
+                    // 주파수 (높은 음)
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1000, startTime);
+                    
+                    // 짧고 명료하게
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.2);
+                }
+                
+            } catch (error) {
+                console.warn('Web Audio API error:', error);
+            }
+        }
+        
+        // Break 시작 소리 - 차분하고 낮은 소리 "띵~"
+        function playBreakStartSound() {
+            if (!soundEnabled) return;
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioContext.currentTime;
+                
+                // 낮고 부드러운 음
+                const osc1 = audioContext.createOscillator();
+                const gain1 = audioContext.createGain();
+                
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(500, now);
+                
+                // 길게 울림
+                gain1.gain.setValueAtTime(0.25, now);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                
+                osc1.connect(gain1);
+                gain1.connect(audioContext.destination);
+                
+                osc1.start(now);
+                osc1.stop(now + 1.5);
+                
+                // 화음 추가 (더 부드럽게)
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(400, now);
+                
+                gain2.gain.setValueAtTime(0.15, now);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
+                
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                
+                osc2.start(now);
+                osc2.stop(now + 1.8);
+                
+            } catch (error) {
+                console.warn('Web Audio API error:', error);
+            }
+        }
+        
+        // 종소리 재생 함수 (타이머 종료 시)
         function playBellSound() {
             try {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
