@@ -794,13 +794,22 @@
             playAlert();
             
             if (currentMode === 'focus') {
-                statusMessage.textContent = '🎉 Focus session complete! Time for a break!';
+                statusMessage.textContent = '🎉 Focus session complete! Switching to break...';
+                
+                // 2초 후 Break 모드로 자동 전환
+                setTimeout(() => {
+                    switchMode('break');
+                    statusMessage.textContent = 'Break time! Take a rest ☕';
+                }, 2000);
             } else {
-                statusMessage.textContent = '⏰ Break time is over! Time to focus!';
+                statusMessage.textContent = '⏰ Break time is over! Switching to focus...';
+                
+                // 2초 후 Focus 모드로 자동 전환
+                setTimeout(() => {
+                    switchMode('focus');
+                    statusMessage.textContent = 'Ready to focus again! 💪';
+                }, 2000);
             }
-            
-            // 타이머 자동 리셋
-            resetTimer();
         }
 
         // 사운드 토글 함수
