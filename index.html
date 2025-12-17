@@ -628,6 +628,7 @@
         let timerInterval = null;
         let totalTime = FOCUS_TIME;
         let soundEnabled = localStorage.getItem('soundEnabled') !== 'false'; // 기본값: true
+        let audioContext = null; // AudioContext를 전역으로 관리
 
         // DOM 요소
         const timeText = document.getElementById('timeText');
@@ -728,6 +729,9 @@
         // 타이머 시작
         function startTimer(autoStart = false) {
             if (isRunning) return;
+            
+            // 사용자 제스처 시 AudioContext 초기화 (모바일 호환성)
+            initAudioContext();
             
             isRunning = true;
             startBtn.disabled = true;
@@ -873,13 +877,27 @@
             }
         }
         
+        // AudioContext 초기화 (모바일 호환성)
+        function initAudioContext() {
+            if (!audioContext && (window.AudioContext || window.webkitAudioContext)) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // 모바일에서 AudioContext resume (자동 재생 정책 우회)
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            return audioContext;
+        }
+        
         // Focus 시작 소리 - 높고 경쾌하게 3번 "띵-띵-띵"
         function playFocusStartSound() {
             if (!soundEnabled) return;
             
             try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const now = audioContext.currentTime;
+                const ctx = initAudioContext();
+                if (!ctx) return;
+                
+                const now = ctx.currentTime;
                 
                 // 3번 반복되는 높은 음
                 for (let i = 0; i < 3; i++) {
@@ -897,7 +915,7 @@
                     gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
                     
                     osc.connect(gain);
-                    gain.connect(audioContext.destination);
+                    gain.connect(ctx.destination);
                     
                     osc.start(startTime);
                     osc.stop(startTime + 0.2);
@@ -913,8 +931,10 @@
             if (!soundEnabled) return;
             
             try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const now = audioContext.currentTime;
+                const ctx = initAudioContext();
+                if (!ctx) return;
+                
+                const now = ctx.currentTime;
                 
                 // 낮고 부드러운 음
                 const osc1 = audioContext.createOscillator();
@@ -928,14 +948,14 @@
                 gain1.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
                 
                 osc1.connect(gain1);
-                gain1.connect(audioContext.destination);
+                gain1.connect(ctx.destination);
                 
                 osc1.start(now);
                 osc1.stop(now + 1.5);
                 
                 // 화음 추가 (더 부드럽게)
-                const osc2 = audioContext.createOscillator();
-                const gain2 = audioContext.createGain();
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
                 
                 osc2.type = 'sine';
                 osc2.frequency.setValueAtTime(400, now);
@@ -944,7 +964,7 @@
                 gain2.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
                 
                 osc2.connect(gain2);
-                gain2.connect(audioContext.destination);
+                gain2.connect(ctx.destination);
                 
                 osc2.start(now);
                 osc2.stop(now + 1.8);
@@ -957,12 +977,14 @@
         // 종소리 재생 함수 (타이머 종료 시)
         function playBellSound() {
             try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const now = audioContext.currentTime;
+                const ctx = initAudioContext();
+                if (!ctx) return;
+                
+                const now = ctx.currentTime;
                 
                 // 첫 번째 종소리 (높은 음)
-                const oscillator1 = audioContext.createOscillator();
-                const gainNode1 = audioContext.createGain();
+                const oscillator1 = ctx.createOscillator();
+                const gainNode1 = ctx.createGain();
                 
                 oscillator1.type = 'sine';
                 oscillator1.frequency.setValueAtTime(800, now);
@@ -972,14 +994,14 @@
                 gainNode1.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
                 
                 oscillator1.connect(gainNode1);
-                gainNode1.connect(audioContext.destination);
+                gainNode1.connect(ctx.destination);
                 
                 oscillator1.start(now);
                 oscillator1.stop(now + 1.5);
                 
                 // 두 번째 종소리 (더 높은 음 - 화음)
-                const oscillator2 = audioContext.createOscillator();
-                const gainNode2 = audioContext.createGain();
+                const oscillator2 = ctx.createOscillator();
+                const gainNode2 = ctx.createGain();
                 
                 oscillator2.type = 'sine';
                 oscillator2.frequency.setValueAtTime(1200, now);
@@ -988,14 +1010,14 @@
                 gainNode2.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
                 
                 oscillator2.connect(gainNode2);
-                gainNode2.connect(audioContext.destination);
+                gainNode2.connect(ctx.destination);
                 
                 oscillator2.start(now);
                 oscillator2.stop(now + 1.2);
                 
                 // 세 번째 종소리 (중간 음 - 깊이감)
-                const oscillator3 = audioContext.createOscillator();
-                const gainNode3 = audioContext.createGain();
+                const oscillator3 = ctx.createOscillator();
+                const gainNode3 = ctx.createGain();
                 
                 oscillator3.type = 'triangle';
                 oscillator3.frequency.setValueAtTime(600, now);
@@ -1004,7 +1026,7 @@
                 gainNode3.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
                 
                 oscillator3.connect(gainNode3);
-                gainNode3.connect(audioContext.destination);
+                gainNode3.connect(ctx.destination);
                 
                 oscillator3.start(now);
                 oscillator3.stop(now + 1.8);

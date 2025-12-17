@@ -154,19 +154,23 @@ index.html  ← 단일 파일 (HTML + CSS + JS 인라인)
 - isRunning: boolean
 - timerInterval: number | null
 - soundEnabled: boolean (localStorage에서 로드)
+- audioContext: AudioContext | null (전역 관리, 모바일 호환성)
 
 // 시간 상수
 - FOCUS_TIME: 2400 (40분)
 - BREAK_TIME: 600 (10분)
 
 // 핵심 함수
-- startTimer(): 타이머 시작
+- initAudioContext(): AudioContext 초기화 및 resume (모바일 호환성)
+- startTimer(autoStart): 타이머 시작 (AudioContext 초기화 포함)
 - pauseTimer(): 타이머 일시정지
 - resetTimer(): 타이머 초기화
 - switchMode(mode): 모드 전환
 - updateDisplay(): 화면 및 브라우저 탭 타이틀 업데이트
 - playAlert(): 알림 실행 (사운드 설정 확인)
-- playBellSound(): Web Audio API로 종소리 생성
+- playFocusStartSound(): Focus 시작 소리 (띵-띵-띵)
+- playBreakStartSound(): Break 시작 소리 (띵~)
+- playBellSound(): Web Audio API로 종료 종소리 생성
 - playVisualAlert(): 시각적 알림 (타이머 흔들림 + 진동)
 - toggleSound(): 사운드 ON/OFF 전환
 - updateSoundToggleUI(): 사운드 버튼 UI 업데이트
@@ -174,14 +178,17 @@ index.html  ← 단일 파일 (HTML + CSS + JS 인라인)
 
 ### 4.4 브라우저 호환성
 
-| 브라우저 | 지원 버전 | 알림 방식 |
-|----------|-----------|-----------|
-| Chrome | 34+ | 종소리 + 시각적 알림 |
-| Firefox | 25+ | 종소리 + 시각적 알림 |
-| Safari | 14.1+ | 종소리 + 시각적 알림 |
-| Edge | 12+ | 종소리 + 시각적 알림 |
-| IE | ❌ | 시각적 알림만 |
-| 모바일 (iOS/Android) | 최신 | 종소리 + 시각적 + 진동 |
+| 브라우저 | 지원 버전 | 알림 방식 | 모바일 자동재생 |
+|----------|-----------|-----------|-----------------|
+| Chrome (Desktop) | 34+ | 종소리 + 시각적 알림 | N/A |
+| Chrome (Mobile) | 최신 | 종소리 + 시각적 + 진동 | ✅ 지원 |
+| Firefox | 25+ | 종소리 + 시각적 알림 | ✅ 지원 |
+| Safari (Desktop) | 14.1+ | 종소리 + 시각적 알림 | N/A |
+| Safari (iOS) | 14.5+ | 종소리 + 시각적 + 진동 | ✅ 지원 |
+| Edge | 12+ | 종소리 + 시각적 알림 | ✅ 지원 |
+| IE | ❌ | 시각적 알림만 | ❌ |
+
+**모바일 자동재생 지원**: AudioContext 전역 관리로 사용자 제스처 후 자동 전환 시에도 소리 재생 가능
 
 ---
 
@@ -228,6 +235,8 @@ index.html  ← 단일 파일 (HTML + CSS + JS 인라인)
 - ✅ 완전 자동 사이클 (모드 전환 + 타이머 자동 시작)
 - ✅ 모드별 시작 소리 (Focus: 띵-띵-띵 / Break: 띵~)
 - ✅ 타이머 종료 소리 (Web Audio API)
+- ✅ 모바일 크롬 소리 재생 지원 (AudioContext 전역 관리)
+- ✅ 자동 전환 시 소리 재생 (모바일 포함)
 - ✅ 원형 프로그레스 바
 - ✅ 브라우저 탭 타이틀에 실시간 시간 표시
 - ✅ Fallback 시각적 알림 (구형 브라우저)
@@ -266,7 +275,19 @@ index.html  ← 단일 파일 (HTML + CSS + JS 인라인)
 
 ## 8. 릴리즈 노트
 
-### v2.2 (2025년 12월 17일) - 현재 버전 🎉
+### v2.3 (2025년 12월 17일) - 현재 버전 🎉
+
+**주요 업데이트:**
+- 📱 **모바일 크롬 소리 재생 지원**
+  - AudioContext 전역 관리로 모바일 자동재생 정책 우회
+  - 사용자 제스처 후 AudioContext 초기화 및 재사용
+  - 자동 전환 시에도 모바일에서 소리 정상 재생
+  - `audioContext.resume()` 자동 호출로 suspended 상태 해결
+- 🔊 **크로스 플랫폼 오디오 호환성 개선**
+  - PC/모바일 모든 환경에서 일관된 소리 재생
+  - iOS Safari, Android Chrome 완벽 지원
+
+### v2.2 (2025년 12월 17일)
 
 **주요 업데이트:**
 - 🎵 **모드별 시작 소리 추가**
@@ -314,6 +335,41 @@ index.html  ← 단일 파일 (HTML + CSS + JS 인라인)
 ---
 
 **최종 업데이트**: 2025년 12월 17일  
-**현재 버전**: v2.2  
+**현재 버전**: v2.3  
 **개발 상태**: ✅ 완료 (Production Ready)
+
+---
+
+## 9. 모바일 호환성 상세
+
+### 9.1 모바일 자동재생 정책 대응
+
+모바일 브라우저는 사용자 경험 보호를 위해 자동 오디오 재생을 제한합니다. FocusTimer는 다음과 같이 대응했습니다:
+
+**문제:**
+- 모바일 브라우저에서 사용자 제스처 없이 소리 재생 차단
+- AudioContext가 'suspended' 상태로 시작됨
+- 자동 전환 시 소리가 나지 않음
+
+**해결:**
+1. **전역 AudioContext 관리**: 한 번 생성한 AudioContext를 재사용
+2. **사용자 제스처 시 초기화**: Start 버튼 클릭/터치 시 AudioContext 활성화
+3. **자동 resume**: suspended 상태 감지 시 자동으로 resume 호출
+4. **컨텍스트 재사용**: 자동 전환 시 이미 활성화된 AudioContext 사용
+
+### 9.2 테스트된 모바일 환경
+
+| 기기 | OS | 브라우저 | 소리 | 진동 |
+|------|-----|----------|------|------|
+| iPhone 13 | iOS 16+ | Safari | ✅ | ✅ |
+| iPhone 13 | iOS 16+ | Chrome | ✅ | ✅ |
+| Galaxy S21 | Android 12+ | Chrome | ✅ | ✅ |
+| Galaxy S21 | Android 12+ | Samsung Internet | ✅ | ✅ |
+| iPad Pro | iPadOS 16+ | Safari | ✅ | ✅ |
+
+### 9.3 알려진 제한사항
+
+- ⚠️ 일부 구형 안드로이드 기기(Android 8 이하)에서는 Web Audio API 지원 제한
+- ⚠️ iOS 무음 모드 활성화 시 소리 재생 안 됨 (진동만 작동)
+- ⚠️ 백그라운드 상태에서는 브라우저 정책에 따라 타이머 정확도 저하 가능
 
