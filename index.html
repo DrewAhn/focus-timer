@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusTimer - Pomodoro Timer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0D0D0D;
+            --bg-secondary: #1A1A2E;
+            --focus-color: #00FFCC;
+            --break-color: #FF6B9D;
+            --btn-primary: #A78BFA;
+            --btn-primary-hover: #8B5CF6;
+            --btn-pause: #60A5FA;
+            --btn-pause-hover: #3B82F6;
+            --btn-reset: #FB923C;
+            --btn-reset-hover: #F97316;
+            --sound-active: #FCD34D;
+            --sound-active-hover: #F59E0B;
+            --text-main: #FFFFFF;
+            --text-secondary: #888888;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-secondary) 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        .container {
+            text-align: center;
+            padding: clamp(1rem, 3vw, 2rem);
+            max-width: 600px;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .header {
+            margin-bottom: clamp(1.5rem, 4vh, 3rem);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: clamp(1.75rem, 5vw, 2.5rem);
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 0.5rem;
+            flex: 1 1 auto;
+        }
+
+        .sound-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2.5vw, 1rem);
+            border-radius: 50px;
+            border: 2px solid var(--text-secondary);
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .sound-toggle:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
+        .sound-toggle.active {
+            border-color: var(--sound-active);
+            color: var(--sound-active);
+            background: rgba(252, 211, 77, 0.05);
+            box-shadow: 0 0 15px rgba(252, 211, 77, 0.4);
+        }
+
+        .sound-toggle.active:hover {
+            border-color: var(--sound-active-hover);
+            color: var(--sound-active-hover);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+
+        .sound-icon {
+            font-size: 1.2rem;
+        }
+
+        .logo-emoji {
+            display: inline-block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: clamp(0.5rem, 2vw, 1rem);
+            justify-content: center;
+            margin-bottom: clamp(1.5rem, 4vh, 3rem);
+            flex-wrap: wrap;
+        }
+
+        .mode-tab {
+            padding: clamp(0.6rem, 2vw, 0.75rem) clamp(1.5rem, 4vw, 2rem);
+            background: transparent;
+            border: 2px solid var(--text-secondary);
+            border-radius: 50px;
+            color: var(--text-secondary);
+            font-size: clamp(0.85rem, 2.5vw, 1rem);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 100px;
+        }
+
+        .mode-tab:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
+        .mode-tab.active.focus {
+            border-color: var(--focus-color);
+            color: var(--focus-color);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            background: rgba(0, 255, 204, 0.05);
+        }
+
+        .mode-tab.active.break {
+            border-color: var(--break-color);
+            color: var(--break-color);
+            box-shadow: 0 0 20px rgba(255, 107, 157, 0.4);
+            background: rgba(255, 107, 157, 0.05);
+        }
+
+        .timer-display {
+            position: relative;
+            margin: clamp(1.5rem, 3vh, 3rem) auto;
+            width: clamp(240px, 60vw, 320px);
+            height: clamp(240px, 60vw, 320px);
+            max-width: 90vmin;
+            max-height: 90vmin;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(26, 26, 46, 0.5);
+            border: 3px solid var(--text-secondary);
+            transition: all 0.4s ease;
+        }
+
+        .timer-display.focus {
+            border-color: var(--focus-color);
+            box-shadow: 
+                0 0 40px rgba(0, 255, 204, 0.3),
+                inset 0 0 40px rgba(0, 255, 204, 0.05);
+        }
+
+        .timer-display.break {
+            border-color: var(--break-color);
+            box-shadow: 
+                0 0 40px rgba(255, 107, 157, 0.3),
+                inset 0 0 40px rgba(255, 107, 157, 0.05);
+        }
+
+        .timer-circle {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            transform: rotate(-90deg);
+        }
+
+        .timer-circle circle {
+            fill: none;
+            stroke-width: 6;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s linear;
+        }
+
+        .timer-circle .bg-circle {
+            stroke: rgba(255, 255, 255, 0.05);
+        }
+
+        .timer-circle .progress-circle {
+            stroke: var(--focus-color);
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .timer-circle.break .progress-circle {
+            stroke: var(--break-color);
+        }
+
+        .time-text {
+            font-family: 'Courier New', monospace;
+            font-size: clamp(2.5rem, 10vw, 4.5rem);
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            position: relative;
+            z-index: 10;
+        }
+
+        .time-text.focus {
+            color: var(--focus-color);
+            text-shadow: 0 0 30px rgba(0, 255, 204, 0.6);
+        }
+
+        .time-text.break {
+            color: var(--break-color);
+            text-shadow: 0 0 30px rgba(255, 107, 157, 0.6);
+        }
+
+        .controls {
+            display: flex;
+            gap: clamp(0.5rem, 2vw, 1rem);
+            justify-content: center;
+            margin-bottom: clamp(1rem, 3vh, 2rem);
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn {
+            padding: clamp(0.75rem, 2.5vw, 1rem) clamp(1.5rem, 4vw, 2.5rem);
+            font-size: clamp(0.85rem, 2.5vw, 1rem);
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+            flex: 1 1 auto;
+            min-width: 90px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-start {
+            background: var(--btn-primary);
+            color: var(--text-main);
+            box-shadow: 0 0 20px rgba(167, 139, 250, 0.3);
+        }
+
+        .btn-start:hover {
+            background: var(--btn-primary-hover);
+            box-shadow: 0 0 35px rgba(139, 92, 246, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .btn-pause {
+            background: transparent;
+            color: var(--btn-pause);
+            border: 2px solid var(--btn-pause);
+        }
+
+        .btn-pause:hover {
+            background: var(--btn-pause);
+            color: var(--text-main);
+            box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+            border-color: var(--btn-pause-hover);
+        }
+
+        .btn-reset {
+            background: transparent;
+            color: var(--btn-reset);
+            border: 2px solid var(--btn-reset);
+        }
+
+        .btn-reset:hover {
+            background: var(--btn-reset);
+            color: var(--text-main);
+            box-shadow: 0 0 20px rgba(251, 146, 60, 0.4);
+            border-color: var(--btn-reset-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            font-size: clamp(0.95rem, 2.5vw, 1.2rem);
+            color: var(--text-secondary);
+            font-weight: 500;
+            min-height: 1.5rem;
+            font-style: italic;
+            padding: 0 1rem;
+        }
+
+        .status-message.focus {
+            color: var(--focus-color);
+        }
+
+        .status-message.break {
+            color: var(--break-color);
+        }
+
+        /* 작은 모바일 (320px - 480px) */
+        @media (max-width: 480px) {
+            .header {
+                flex-direction: column;
+                gap: 0.75rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .logo {
+                font-size: 1.75rem;
+                margin-bottom: 0;
+            }
+
+            .sound-toggle {
+                font-size: 0.8rem;
+                padding: 0.5rem 1rem;
+            }
+
+            .mode-tabs {
+                width: 100%;
+                margin-bottom: 1.5rem;
+            }
+
+            .mode-tab {
+                flex: 1;
+                padding: 0.7rem 1rem;
+                font-size: 0.85rem;
+                min-width: 0;
+            }
+
+            .timer-display {
+                margin: 1.5rem auto;
+            }
+
+            .controls {
+                flex-direction: column;
+                gap: 0.75rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .btn {
+                width: 100%;
+                padding: 0.9rem 1.5rem;
+                font-size: 0.9rem;
+            }
+
+            .status-message {
+                font-size: 0.95rem;
+            }
+        }
+
+        /* 중간 모바일 (481px - 640px) */
+        @media (min-width: 481px) and (max-width: 640px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .controls {
+                max-width: 400px;
+            }
+
+            .btn {
+                min-width: 100px;
+            }
+        }
+
+        /* 태블릿 (641px - 768px) */
+        @media (min-width: 641px) and (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+            }
+
+            .timer-display {
+                width: 300px;
+                height: 300px;
+            }
+
+            .controls {
+                max-width: 450px;
+            }
+        }
+
+        /* 세로 모드 최적화 */
+        @media (max-height: 700px) and (orientation: portrait) {
+            .container {
+                min-height: auto;
+                padding: 1rem;
+            }
+
+            .header {
+                margin-bottom: 1rem;
+            }
+
+            .mode-tabs {
+                margin-bottom: 1rem;
+            }
+
+            .timer-display {
+                margin: 1rem auto;
+                width: clamp(200px, 50vw, 280px);
+                height: clamp(200px, 50vw, 280px);
+            }
+
+            .controls {
+                margin-bottom: 1rem;
+            }
+
+            .status-message {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* 가로 모드 최적화 */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .container {
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                padding: 0.5rem;
+                min-height: auto;
+            }
+
+            .header {
+                position: absolute;
+                top: 0.5rem;
+                left: 50%;
+                transform: translateX(-50%);
+                margin-bottom: 0;
+                flex-direction: row;
+            }
+
+            .logo {
+                font-size: 1.5rem;
+            }
+
+            .sound-toggle {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.8rem;
+            }
+
+            .mode-tabs {
+                margin-bottom: 0;
+            }
+
+            .timer-display {
+                width: clamp(180px, 35vh, 240px);
+                height: clamp(180px, 35vh, 240px);
+                margin: 0;
+            }
+
+            .time-text {
+                font-size: clamp(1.8rem, 8vh, 3rem);
+            }
+
+            .controls {
+                flex-direction: column;
+                margin-bottom: 0;
+                gap: 0.5rem;
+                max-width: 200px;
+            }
+
+            .btn {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.8rem;
+            }
+
+            .status-message {
+                position: absolute;
+                bottom: 0.5rem;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 0.85rem;
+            }
+        }
+
+        /* 초소형 화면 (갤럭시 폴드 등) */
+        @media (max-width: 320px) {
+            .logo {
+                font-size: 1.5rem;
+            }
+
+            .sound-icon {
+                font-size: 1rem;
+            }
+
+            .mode-tab {
+                font-size: 0.75rem;
+                padding: 0.6rem 0.8rem;
+            }
+
+            .timer-display {
+                width: 200px;
+                height: 200px;
+            }
+
+            .time-text {
+                font-size: 2rem;
+            }
+
+            .btn {
+                font-size: 0.8rem;
+                padding: 0.75rem 1rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .running .time-text {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* 알림 애니메이션 (Fallback용) */
+        @keyframes flashAlert {
+            0%, 100% { 
+                opacity: 1;
+                transform: scale(1);
+            }
+            25% { 
+                opacity: 0.3;
+                transform: scale(1.1);
+            }
+            50% { 
+                opacity: 1;
+                transform: scale(1);
+            }
+            75% { 
+                opacity: 0.3;
+                transform: scale(1.1);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+            20%, 40%, 60%, 80% { transform: translateX(10px); }
+        }
+
+        .alert-animation {
+            animation: flashAlert 1s ease-in-out 3, shake 0.5s ease-in-out 2;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="logo">
+                <span class="logo-emoji">🍅</span> FocusTimer
+            </h1>
+            <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">
+                <span class="sound-icon" id="soundIcon">🔊</span>
+                <span id="soundText">Sound</span>
+            </button>
+        </div>
+
+        <div class="mode-tabs">
+            <button class="mode-tab active focus" id="focusTab" onclick="switchMode('focus')">
+                Focus
+            </button>
+            <button class="mode-tab" id="breakTab" onclick="switchMode('break')">
+                Break
+            </button>
+        </div>
+
+        <div class="timer-display focus" id="timerDisplay">
+            <svg class="timer-circle focus" id="timerCircle" viewBox="0 0 320 320">
+                <circle class="bg-circle" cx="160" cy="160" r="154"></circle>
+                <circle class="progress-circle" id="progressCircle" cx="160" cy="160" r="154"></circle>
+            </svg>
+            <div class="time-text focus" id="timeText">40:00</div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn" onclick="startTimer()">Start</button>
+            <button class="btn btn-pause" id="pauseBtn" onclick="pauseTimer()" disabled>Pause</button>
+            <button class="btn btn-reset" id="resetBtn" onclick="resetTimer()">Reset</button>
+        </div>
+
+        <div class="status-message focus" id="statusMessage">Time to focus! 💪</div>
+    </div>
+
+    <script>
+        // 상수 정의
+        const FOCUS_TIME = 40 * 60; // 40분 (2400초)
+        const BREAK_TIME = 10 * 60; // 10분 (600초)
+
+        // 상태 변수
+        let currentMode = 'focus';
+        let timeLeft = FOCUS_TIME;
+        let isRunning = false;
+        let timerInterval = null;
+        let totalTime = FOCUS_TIME;
+        let soundEnabled = localStorage.getItem('soundEnabled') !== 'false'; // 기본값: true
+
+        // DOM 요소
+        const timeText = document.getElementById('timeText');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const timerCircle = document.getElementById('timerCircle');
+        const progressCircle = document.getElementById('progressCircle');
+        const statusMessage = document.getElementById('statusMessage');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const focusTab = document.getElementById('focusTab');
+        const breakTab = document.getElementById('breakTab');
+        const soundToggle = document.getElementById('soundToggle');
+        const soundIcon = document.getElementById('soundIcon');
+        const soundText = document.getElementById('soundText');
+
+        // 원형 프로그레스바 설정
+        const radius = 154;
+        const circumference = 2 * Math.PI * radius;
+        progressCircle.style.strokeDasharray = circumference;
+        progressCircle.style.strokeDashoffset = 0;
+
+        // 시간 포맷 함수 (MM:SS)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // 화면 업데이트
+        function updateDisplay() {
+            const formattedTime = formatTime(timeLeft);
+            timeText.textContent = formattedTime;
+            
+            // 브라우저 탭 타이틀 업데이트
+            const modeText = currentMode === 'focus' ? 'Focus' : 'Break';
+            document.title = `${formattedTime} - ${modeText} Timer`;
+            
+            // 프로그레스 서클 업데이트
+            const progress = timeLeft / totalTime;
+            const offset = circumference * (1 - progress);
+            progressCircle.style.strokeDashoffset = offset;
+        }
+
+        // 모드 전환
+        function switchMode(mode) {
+            if (isRunning) {
+                pauseTimer();
+            }
+
+            currentMode = mode;
+            
+            if (mode === 'focus') {
+                timeLeft = FOCUS_TIME;
+                totalTime = FOCUS_TIME;
+                
+                // UI 업데이트
+                focusTab.classList.add('active', 'focus');
+                breakTab.classList.remove('active', 'break');
+                
+                timerDisplay.classList.remove('break');
+                timerDisplay.classList.add('focus');
+                
+                timerCircle.classList.remove('break');
+                timerCircle.classList.add('focus');
+                
+                timeText.classList.remove('break');
+                timeText.classList.add('focus');
+                
+                statusMessage.classList.remove('break');
+                statusMessage.classList.add('focus');
+                statusMessage.textContent = 'Time to focus! 💪';
+            } else {
+                timeLeft = BREAK_TIME;
+                totalTime = BREAK_TIME;
+                
+                // UI 업데이트
+                breakTab.classList.add('active', 'break');
+                focusTab.classList.remove('active', 'focus');
+                
+                timerDisplay.classList.remove('focus');
+                timerDisplay.classList.add('break');
+                
+                timerCircle.classList.remove('focus');
+                timerCircle.classList.add('break');
+                
+                timeText.classList.remove('focus');
+                timeText.classList.add('break');
+                
+                statusMessage.classList.remove('focus');
+                statusMessage.classList.add('break');
+                statusMessage.textContent = 'Take a break! ☕';
+            }
+            
+            updateDisplay();
+        }
+
+        // 타이머 시작
+        function startTimer() {
+            if (isRunning) return;
+            
+            isRunning = true;
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            
+            timerDisplay.classList.add('running');
+            
+            if (currentMode === 'focus') {
+                statusMessage.textContent = 'Stay focused! 🎯';
+            } else {
+                statusMessage.textContent = 'Enjoy your break! 🌈';
+            }
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                
+                if (timeLeft <= 0) {
+                    timerComplete();
+                }
+            }, 1000);
+        }
+
+        // 타이머 일시정지
+        function pauseTimer() {
+            if (!isRunning) return;
+            
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            
+            timerDisplay.classList.remove('running');
+            
+            if (currentMode === 'focus') {
+                statusMessage.textContent = 'Paused. Ready to continue? ⏸️';
+            } else {
+                statusMessage.textContent = 'Break paused ⏸️';
+            }
+        }
+
+        // 타이머 리셋
+        function resetTimer() {
+            pauseTimer();
+            
+            if (currentMode === 'focus') {
+                timeLeft = FOCUS_TIME;
+                statusMessage.textContent = 'Time to focus! 💪';
+            } else {
+                timeLeft = BREAK_TIME;
+                statusMessage.textContent = 'Take a break! ☕';
+            }
+            
+            updateDisplay();
+        }
+
+        // 타이머 완료
+        function timerComplete() {
+            pauseTimer();
+            
+            // 알림 실행
+            playAlert();
+            
+            if (currentMode === 'focus') {
+                statusMessage.textContent = '🎉 Focus session complete! Time for a break!';
+            } else {
+                statusMessage.textContent = '⏰ Break time is over! Time to focus!';
+            }
+            
+            // 타이머 자동 리셋
+            resetTimer();
+        }
+
+        // 사운드 토글 함수
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('soundEnabled', soundEnabled);
+            updateSoundToggleUI();
+        }
+        
+        // 사운드 토글 UI 업데이트
+        function updateSoundToggleUI() {
+            if (soundEnabled) {
+                soundToggle.classList.add('active');
+                soundIcon.textContent = '🔊';
+                soundText.textContent = 'Sound';
+            } else {
+                soundToggle.classList.remove('active');
+                soundIcon.textContent = '🔇';
+                soundText.textContent = 'Muted';
+            }
+        }
+        
+        // 알림 실행 함수
+        function playAlert() {
+            // Web Audio API 지원 여부 확인
+            const audioSupported = !!(window.AudioContext || window.webkitAudioContext);
+            
+            // 케이스 1: Web Audio API 지원 + 사운드 ON
+            if (audioSupported && soundEnabled) {
+                playBellSound();
+                playVisualAlert(); // 타이머 흔들림
+            } 
+            // 케이스 2: Web Audio API 미지원 또는 사운드 OFF
+            else {
+                playVisualAlert(); // 타이머 흔들림만
+            }
+        }
+        
+        // 종소리 재생 함수 (Web Audio API)
+        function playBellSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioContext.currentTime;
+                
+                // 첫 번째 종소리 (높은 음)
+                const oscillator1 = audioContext.createOscillator();
+                const gainNode1 = audioContext.createGain();
+                
+                oscillator1.type = 'sine';
+                oscillator1.frequency.setValueAtTime(800, now);
+                
+                // 페이드 아웃 효과
+                gainNode1.gain.setValueAtTime(0.3, now);
+                gainNode1.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                
+                oscillator1.connect(gainNode1);
+                gainNode1.connect(audioContext.destination);
+                
+                oscillator1.start(now);
+                oscillator1.stop(now + 1.5);
+                
+                // 두 번째 종소리 (더 높은 음 - 화음)
+                const oscillator2 = audioContext.createOscillator();
+                const gainNode2 = audioContext.createGain();
+                
+                oscillator2.type = 'sine';
+                oscillator2.frequency.setValueAtTime(1200, now);
+                
+                gainNode2.gain.setValueAtTime(0.2, now);
+                gainNode2.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+                
+                oscillator2.connect(gainNode2);
+                gainNode2.connect(audioContext.destination);
+                
+                oscillator2.start(now);
+                oscillator2.stop(now + 1.2);
+                
+                // 세 번째 종소리 (중간 음 - 깊이감)
+                const oscillator3 = audioContext.createOscillator();
+                const gainNode3 = audioContext.createGain();
+                
+                oscillator3.type = 'triangle';
+                oscillator3.frequency.setValueAtTime(600, now);
+                
+                gainNode3.gain.setValueAtTime(0.15, now);
+                gainNode3.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
+                
+                oscillator3.connect(gainNode3);
+                gainNode3.connect(audioContext.destination);
+                
+                oscillator3.start(now);
+                oscillator3.stop(now + 1.8);
+                
+            } catch (error) {
+                console.warn('Web Audio API error:', error);
+            }
+        }
+        
+        // 시각적 알림 (타이머 흔들림 + 모바일 진동)
+        function playVisualAlert() {
+            const timerDisplay = document.getElementById('timerDisplay');
+            
+            // 타이머 디스플레이 흔들림 애니메이션
+            timerDisplay.classList.add('alert-animation');
+            
+            // 애니메이션 종료 후 클래스 제거
+            setTimeout(() => {
+                timerDisplay.classList.remove('alert-animation');
+            }, 2000);
+            
+            // 진동 API 지원 시 진동 추가 (모바일)
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200, 100, 200]);
+            }
+        }
+        
+        // 초기화
+        updateDisplay();
+        updateSoundToggleUI();
+    </script>
+</body>
+</html>
+
